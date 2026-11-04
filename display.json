@@ -1,0 +1,8 @@
+{
+  "name": "Floor Plan Editor",
+  "icon": "🗺️",
+  "group": "Design",
+  "description": "Architectural floor plan spatial editor with room boundaries, drop markers, and scale bars",
+  "entrypoint": "index.html",
+  "blockTypes": ["floorplan", "spatial", "architectural"]
+}

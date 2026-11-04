@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Floor Plan Editor — APK.audio</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <style>
+    .workspace {
+      display: grid;
+      grid-template-columns: 240px 1fr 280px;
+      flex: 1;
+      overflow: hidden;
+    }
+    .panel {
+      background: var(--osc-bg-surface);
+      border-right: 1px solid var(--osc-border-default);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-right {
+      border-right: none;
+      border-left: 1px solid var(--osc-border-default);
+    }
+    .panel-header {
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--osc-text-muted);
+      border-bottom: 1px solid var(--osc-border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-body {
+      padding: 12px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .canvas-viewport {
+      background: var(--osc-bg-base);
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .toolbar-bar {
+      height: 36px;
+      background: var(--osc-bg-surface);
+      border-bottom: 1px solid var(--osc-border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-window-header">
+    <div class="window-title-group">
+      <div class="window-dot"></div>
+      <span class="window-title">Floor Plan Editor</span>
+      <span class="window-pill" id="block-tag">SPATIAL / ARCHITECTURAL</span>
+    </div>
+    <div class="window-actions">
+      <button class="btn btn-secondary btn-sm" id="btn-open-block">📂 Open Block</button>
+      <button class="btn btn-secondary btn-sm" id="btn-discovered">⚡ Discovered</button>
+      <button class="btn btn-secondary btn-sm" id="btn-export-geojson">🌍 Export GeoJSON</button>
+      <button class="btn btn-primary btn-sm" id="btn-save-block">💾 Save & Return</button>
+      <button class="btn btn-icon btn-sm" id="btn-close" title="Close Window">✕</button>
+    </div>
+  </header>
+
+  <div class="toolbar-bar">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button class="btn btn-secondary btn-sm" id="btn-mode-place">📍 Place Drop Tool</button>
+      <span style="font-size: 11px; color: var(--osc-text-muted);">Click on canvas to drop selected category</span>
+    </div>
+    <div id="telemetry-metrics"></div>
+  </div>
+
+  <div class="workspace">
+    <!-- Left Drop Marker Palette -->
+    <aside class="panel">
+      <div class="panel-header">
+        <span>DROP TYPES</span>
+      </div>
+      <div class="panel-body">
+        <div style="font-size: 10px; color: var(--osc-text-muted); margin-bottom: 8px;">SELECT CATEGORY TO PLACE</div>
+        <div id="palette-categories" style="display: flex; flex-direction: column; gap: 6px;"></div>
+      </div>
+    </aside>
+
+    <!-- Center Interactive SVG Canvas -->
+    <main class="canvas-viewport" id="canvas-wrapper">
+      <!-- Floor Plan SVG dynamically rendered here -->
+    </main>
+
+    <!-- Right Inspector -->
+    <aside class="panel panel-right">
+      <div class="panel-header">
+        <span>INSPECTOR</span>
+      </div>
+      <div class="panel-body" id="inspector-content">
+        <!-- Drop / Room details rendered here -->
+      </div>
+    </aside>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
