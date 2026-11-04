@@ -1,7 +1,7 @@
 // Part of the APK.audio project — http://APK.audio — made by Anthony Kuzub
 // MIT Licence. Free, for everyone, for ever. Full text in LICENSE at the root.
 
-import { BlockBridge } from './blockBridge.js';
+import { linkBlock, mountDiscovered } from './softappLink.js';
 import { FloorPlanModel, DROP_CATEGORIES } from './floorPlanModel.js';
 import { renderFloorPlanSvg } from './floorPlanSvg.js';
 
@@ -9,16 +9,21 @@ let model = new FloorPlanModel();
 let activeCategory = 'DATA';
 let isPlacingDrop = false;
 
-const bridge = new BlockBridge({
-  name: 'Floor Plan Editor',
-  type: 'floorplan',
-  defaultBlock: model.toJSON(),
-  onBlockLoaded: (block) => {
-    if (block) {
-      model = new FloorPlanModel(block);
-      renderAll();
-    }
+const S = window.APKSoftapp;
+const esc = S.esc;
+
+const bridge = linkBlock(S, {
+  editor: 'Floor Plan Editor',
+  blockType: 'floorplan',
+  Model: FloorPlanModel,
+  getModel: () => model,
+  setModel: (m, meta) => {
+    model = m;
+    const tag = document.getElementById('block-tag');
+    if (tag && (meta.blockName || meta.filename)) tag.textContent = meta.blockName || meta.filename;
+    renderAll();
   },
+  filename: (m) => m.name.toLowerCase().replace(/\s+/g, '_'),
 });
 
 function renderPalette() {
@@ -28,11 +33,11 @@ function renderPalette() {
   container.innerHTML = Object.entries(DROP_CATEGORIES).map(([key, cat]) => {
     const isActive = activeCategory === key;
     return `
-      <button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-category" data-cat="${key}" style="justify-content: flex-start; text-align: left; padding: 8px 10px;">
-        <span style="font-size: 15px; margin-right: 6px;">${cat.icon}</span>
+      <button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-category" data-cat="${esc(key)}" style="justify-content: flex-start; text-align: left; padding: 8px 10px;">
+        <span style="font-size: 15px; margin-right: 6px;">${esc(cat.icon)}</span>
         <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-          <div style="font-weight: 600; font-size: 11px;">${cat.label}</div>
-          <div style="font-size: 9px; opacity: 0.7; font-family: var(--font-mono);">${key}</div>
+          <div style="font-weight: 600; font-size: 11px;">${esc(cat.label)}</div>
+          <div style="font-size: 9px; opacity: 0.7; font-family: var(--font-mono);">${esc(key)}</div>
         </div>
       </button>
     `;
@@ -62,8 +67,8 @@ function renderInspector() {
     container.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--osc-border-default); padding-bottom: 8px;">
         <div style="display: flex; align-items: center; gap: 6px;">
-          <span style="font-size: 18px;">${cat.icon}</span>
-          <span style="font-weight: 700; color: var(--osc-text-primary); font-size: 13px;">${drop.refdes}</span>
+          <span style="font-size: 18px;">${esc(cat.icon)}</span>
+          <span style="font-weight: 700; color: var(--osc-text-primary); font-size: 13px;">${esc(drop.refdes)}</span>
         </div>
         <button class="btn btn-secondary btn-sm" id="btn-delete-drop" style="color: var(--osc-status-danger);">🗑️ Delete</button>
       </div>
@@ -71,36 +76,36 @@ function renderInspector() {
       <div style="display: flex; flex-direction: column; gap: 10px;">
         <div>
           <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">REFERENCE DESIGNATION</label>
-          <input type="text" class="input" id="inp-refdes" value="${drop.refdes}">
+          <input type="text" class="input" id="inp-refdes" value="${esc(drop.refdes)}">
         </div>
         <div>
           <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">LABEL / PURPOSE</label>
-          <input type="text" class="input" id="inp-label" value="${drop.label}">
+          <input type="text" class="input" id="inp-label" value="${esc(drop.label)}">
         </div>
         <div>
           <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">CATEGORY</label>
           <select class="input" id="inp-category">
             ${Object.keys(DROP_CATEGORIES).map((k) => `
-              <option value="${k}" ${drop.category === k ? 'selected' : ''}>${DROP_CATEGORIES[k].label}</option>
+              <option value="${esc(k)}" ${drop.category === k ? 'selected' : ''}>${esc(DROP_CATEGORIES[k].label)}</option>
             `).join('')}
           </select>
         </div>
         <div>
           <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">LOCATION / ROOM</label>
-          <input type="text" class="input" id="inp-room" value="${drop.room}" readonly style="opacity: 0.8;">
+          <input type="text" class="input" id="inp-room" value="${esc(drop.room)}" readonly style="opacity: 0.8;">
         </div>
         <div>
           <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">CIRCUIT / FEED</label>
-          <input type="text" class="input" id="inp-circuit" value="${drop.circuit}">
+          <input type="text" class="input" id="inp-circuit" value="${esc(drop.circuit)}">
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
           <div>
             <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">X (METERS)</label>
-            <input type="number" step="0.5" class="input" id="inp-x" value="${drop.x}">
+            <input type="number" step="0.5" class="input" id="inp-x" value="${esc(drop.x)}">
           </div>
           <div>
             <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">Y (METERS)</label>
-            <input type="number" step="0.5" class="input" id="inp-y" value="${drop.y}">
+            <input type="number" step="0.5" class="input" id="inp-y" value="${esc(drop.y)}">
           </div>
         </div>
       </div>
@@ -108,7 +113,7 @@ function renderInspector() {
 
     document.getElementById('btn-delete-drop')?.addEventListener('click', () => {
       model.deleteDrop(drop.id);
-      bridge.notifyChanged();
+      bridge.changed();
       renderAll();
     });
 
@@ -116,7 +121,7 @@ function renderInspector() {
       document.getElementById(id)?.addEventListener('input', (e) => {
         const val = prop === 'x' || prop === 'y' ? parseFloat(e.target.value) || 0 : e.target.value;
         model.updateDrop(drop.id, { [prop]: val });
-        bridge.notifyChanged();
+        bridge.changed();
         renderSvg();
         renderMetrics();
       });
@@ -142,13 +147,13 @@ function renderInspector() {
     container.innerHTML = `
       <div style="margin-bottom: 12px; border-bottom: 1px solid var(--osc-border-default); padding-bottom: 8px;">
         <span style="font-size: 10px; text-transform: uppercase; color: var(--osc-accent-primary); font-weight: 700;">ROOM PROPERTIES</span>
-        <div style="font-weight: 700; color: var(--osc-text-primary); font-size: 14px; margin-top: 2px;">${room.name}</div>
+        <div style="font-weight: 700; color: var(--osc-text-primary); font-size: 14px; margin-top: 2px;">${esc(room.name)}</div>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 10px;">
         <div>
           <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">ROOM NAME</label>
-          <input type="text" class="input" id="inp-room-name" value="${room.name}">
+          <input type="text" class="input" id="inp-room-name" value="${esc(room.name)}">
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
           <div>
@@ -170,7 +175,7 @@ function renderInspector() {
       for (const d of model.drops) {
         if (d.room === oldName) d.room = room.name;
       }
-      bridge.notifyChanged();
+      bridge.changed();
       renderSvg();
     });
 
@@ -191,9 +196,9 @@ function renderMetrics() {
   const m = model.getMetrics();
   container.innerHTML = `
     <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: var(--osc-text-muted);">
-      <span>TOTAL AREA: <strong style="color: var(--osc-text-primary);">${m.totalAreaSqm} m²</strong></span>
-      <span>ROOMS: <strong style="color: var(--osc-accent-secondary);">${m.roomCount}</strong></span>
-      <span>TOTAL DROPS: <strong style="color: var(--osc-accent-primary);">${m.dropCount}</strong></span>
+      <span>TOTAL AREA: <strong style="color: var(--osc-text-primary);">${esc(m.totalAreaSqm)} m²</strong></span>
+      <span>ROOMS: <strong style="color: var(--osc-accent-secondary);">${esc(m.roomCount)}</strong></span>
+      <span>TOTAL DROPS: <strong style="color: var(--osc-accent-primary);">${esc(m.dropCount)}</strong></span>
     </div>
   `;
 }
@@ -252,7 +257,7 @@ function renderSvg() {
       isPlacingDrop = false;
       document.getElementById('btn-mode-place')?.classList.remove('btn-primary');
       document.getElementById('btn-mode-place')?.classList.add('btn-secondary');
-      bridge.notifyChanged();
+      bridge.changed();
       renderAll();
     } else {
       model.selectedDropId = null;
@@ -296,9 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
       reader.onload = (event) => {
         try {
           const parsed = JSON.parse(event.target.result);
-          model = new FloorPlanModel(parsed);
-          bridge.loadBlock(model.toJSON(), { filename: file.name });
-          renderAll();
+          bridge.openLocal(parsed, { filename: file.name });
         } catch (err) {
           alert('Failed to parse floor plan file: ' + err.message);
         }
@@ -308,17 +311,16 @@ document.addEventListener('DOMContentLoaded', () => {
     input.click();
   });
 
-  document.getElementById('btn-discovered')?.addEventListener('click', async () => {
-    const project = await bridge.fetchDiscoveredProject();
-    if (project) {
-      alert(`Discovered Project: ${project.project_name || 'APK Audio Facility'}\nRooms: ${model.rooms.length}`);
-    } else {
-      alert('Connecting to live discovery bus...');
-    }
+  mountDiscovered(S, window.APKTable, {
+    button: document.getElementById('btn-discovered'),
+    panel: document.getElementById('discovered-panel'),
+    status: document.getElementById('discovered-status'),
+    tableHost: document.getElementById('discovered-table'),
+    tableId: 'floorplan-discovered',
   });
 
   document.getElementById('btn-save-block')?.addEventListener('click', () => {
-    bridge.saveBlock(model.toJSON(), { filename: model.name.toLowerCase().replace(/\s+/g, '_') });
+    bridge.save();
   });
 
   document.getElementById('btn-export-geojson')?.addEventListener('click', () => {

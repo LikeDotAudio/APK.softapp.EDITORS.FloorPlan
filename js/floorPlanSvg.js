@@ -122,7 +122,7 @@ export function renderFloorPlanSvg(model, options = {}) {
               <!-- Acoustic dispersion lines to sweet spot -->
               <line x1="0" y1="0" x2="${mpx - sx}" y2="${mpy - sy}" stroke="#8B5CF6" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
               <rect x="-6" y="-6" width="12" height="12" rx="2" fill="#8B5CF6" stroke="#f4f4f5" stroke-width="1"/>
-              <text y="-8" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="7" fill="#8B5CF6">${spk.label}</text>
+              <text y="-8" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="7" fill="#8B5CF6">${esc(spk.label)}</text>
             </g>
           `;
         }).join('');
@@ -144,7 +144,7 @@ export function renderFloorPlanSvg(model, options = {}) {
         <g class="acoustic-space-badge" transform="translate(${cx - badgeW / 2}, ${ly + 18})">
           <rect width="${badgeW}" height="${badgeH}" rx="3" fill="#0f0f11" stroke="#8B5CF6" stroke-width="1" fill-opacity="0.9"/>
           <text x="${badgeW / 2}" y="14" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="600" fill="#C4B5FD">
-            ${acoustics.classified ? '' : 'set room type · '}${acoustics.volume_m3}m³ · RT₆₀: ${acoustics.rt60_estimated}s · fₛ: ${acoustics.schroeder_freq_hz}Hz · NC-${acoustics.nc_rating}
+            ${acoustics.classified ? '' : 'set room type · '}${esc(acoustics.volume_m3)}m³ · RT₆₀: ${esc(acoustics.rt60_estimated)}s · fₛ: ${esc(acoustics.schroeder_freq_hz)}Hz · NC-${esc(acoustics.nc_rating)}
           </text>
         </g>
       `;
@@ -160,7 +160,7 @@ export function renderFloorPlanSvg(model, options = {}) {
     return `
       <g class="room-group" data-room-id="${esc(room.id)}">
         <polygon points="${ptsStr}"
-          fill="${room.color || '#18181b'}"
+          fill="${esc(room.color || "#18181b")}"
           fill-opacity="${isSelected ? 0.75 : 0.45}"
           stroke="${isSelected ? '#F4902C' : '#4A9EFF'}"
           stroke-width="${isSelected ? 3 : 1.5}"
@@ -200,10 +200,10 @@ export function renderFloorPlanSvg(model, options = {}) {
       <g class="drop-marker" data-drop-id="${esc(drop.id)}" transform="translate(${px}, ${py})" style="cursor: pointer;">
         <!-- Halo selection circle -->
         ${isSelected ? `<circle r="18" fill="none" stroke="#F4902C" stroke-width="2" stroke-dasharray="3,3"/>` : ''}
-        <circle r="13" fill="#18181b" stroke="${cat.color}" stroke-width="${isSelected ? 2.5 : 1.5}" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.6))"/>
-        <text y="4" text-anchor="middle" font-size="12" pointer-events="none">${cat.icon}</text>
+        <circle r="13" fill="#18181b" stroke="${esc(cat.color)}" stroke-width="${isSelected ? 2.5 : 1.5}" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.6))"/>
+        <text y="4" text-anchor="middle" font-size="12" pointer-events="none">${esc(cat.icon)}</text>
         <rect x="16" y="-9" width="${drop.refdes.length * 7 + 10}" height="18" rx="3" fill="#121212" stroke="#2c2c2c" stroke-width="1" opacity="0.9"/>
-        <text x="21" y="3.5" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="600" fill="${cat.color}">${esc(drop.refdes)}</text>
+        <text x="21" y="3.5" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="600" fill="${esc(cat.color)}">${esc(drop.refdes)}</text>
       </g>
     `;
   }).join('');
