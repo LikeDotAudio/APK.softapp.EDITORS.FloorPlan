@@ -14,18 +14,18 @@ export function renderFloorPlanSvg(model, options = {}) {
     gridSvg = `
       <defs>
         <pattern id="grid-minor" width="${ppm / 2}" height="${ppm / 2}" patternUnits="userSpaceOnUse">
-          <path d="M ${ppm / 2} 0 L 0 0 0 ${ppm / 2}" fill="none" stroke="#121A2F" stroke-width="0.5"/>
+          <path d="M ${ppm / 2} 0 L 0 0 0 ${ppm / 2}" fill="none" stroke="#18181b" stroke-width="0.5"/>
         </pattern>
         <pattern id="grid-major" width="${ppm}" height="${ppm}" patternUnits="userSpaceOnUse">
           <rect width="${ppm}" height="${ppm}" fill="url(#grid-minor)"/>
-          <path d="M ${ppm} 0 L 0 0 0 ${ppm}" fill="none" stroke="#1E2A45" stroke-width="1"/>
+          <path d="M ${ppm} 0 L 0 0 0 ${ppm}" fill="none" stroke="#2c2c2c" stroke-width="1"/>
         </pattern>
       </defs>
-      <rect width="100%" height="100%" fill="#080C16"/>
+      <rect width="100%" height="100%" fill="#121212"/>
       <rect width="100%" height="100%" fill="url(#grid-major)"/>
     `;
   } else {
-    gridSvg = `<rect width="100%" height="100%" fill="#080C16"/>`;
+    gridSvg = `<rect width="100%" height="100%" fill="#121212"/>`;
   }
 
   // Rooms
@@ -41,7 +41,7 @@ export function renderFloorPlanSvg(model, options = {}) {
     return `
       <g class="room-group" data-room-id="${room.id}">
         <polygon points="${ptsStr}"
-          fill="${room.color || '#121A2F'}"
+          fill="${room.color || '#18181b'}"
           fill-opacity="${isSelected ? 0.75 : 0.45}"
           stroke="${isSelected ? '#F4902C' : '#4A9EFF'}"
           stroke-width="${isSelected ? 3 : 1.5}"
@@ -51,19 +51,19 @@ export function renderFloorPlanSvg(model, options = {}) {
         <!-- Inner architectural double-line wall -->
         <polygon points="${ptsStr}"
           fill="none"
-          stroke="#0E1424"
+          stroke="#0f0f11"
           stroke-width="5"
           stroke-linejoin="round"
           stroke-opacity="0.8"
         />
         <polygon points="${ptsStr}"
           fill="none"
-          stroke="${isSelected ? '#F4902C' : '#2D3D60'}"
+          stroke="${isSelected ? '#F4902C' : '#3f3f46'}"
           stroke-width="1.5"
           stroke-linejoin="round"
         />
-        <text x="${cx}" y="${cy - 8}" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="13" font-weight="700" fill="#F0F4F8" pointer-events="none">${room.name}</text>
-        <text x="${cx}" y="${cy + 10}" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="10" font-weight="600" fill="#8B9BB4" pointer-events="none">${area} m² (${Math.round(area * 10.764)} sq ft)</text>
+        <text x="${cx}" y="${cy - 8}" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="13" font-weight="700" fill="#f4f4f5" pointer-events="none">${room.name}</text>
+        <text x="${cx}" y="${cy + 10}" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="10" font-weight="600" fill="#888888" pointer-events="none">${area} m² (${Math.round(area * 10.764)} sq ft)</text>
       </g>
     `;
   }).join('');
@@ -79,9 +79,9 @@ export function renderFloorPlanSvg(model, options = {}) {
       <g class="drop-marker" data-drop-id="${drop.id}" transform="translate(${px}, ${py})" style="cursor: pointer;">
         <!-- Halo selection circle -->
         ${isSelected ? `<circle r="18" fill="none" stroke="#F4902C" stroke-width="2" stroke-dasharray="3,3"/>` : ''}
-        <circle r="13" fill="#121A2F" stroke="${cat.color}" stroke-width="${isSelected ? 2.5 : 1.5}" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.6))"/>
+        <circle r="13" fill="#18181b" stroke="${cat.color}" stroke-width="${isSelected ? 2.5 : 1.5}" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.6))"/>
         <text y="4" text-anchor="middle" font-size="12" pointer-events="none">${cat.icon}</text>
-        <rect x="16" y="-9" width="${drop.refdes.length * 7 + 10}" height="18" rx="3" fill="#080C16" stroke="#1E2A45" stroke-width="1" opacity="0.9"/>
+        <rect x="16" y="-9" width="${drop.refdes.length * 7 + 10}" height="18" rx="3" fill="#121212" stroke="#2c2c2c" stroke-width="1" opacity="0.9"/>
         <text x="21" y="3.5" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="600" fill="${cat.color}">${drop.refdes}</text>
       </g>
     `;
@@ -97,14 +97,14 @@ export function renderFloorPlanSvg(model, options = {}) {
 
     scaleSvg = `
       <g class="scale-bar" transform="translate(${sx}, ${sy})">
-        <rect x="0" y="-14" width="${scalePx + 40}" height="28" rx="4" fill="#0E1424" stroke="#1E2A45" stroke-width="1" opacity="0.9"/>
-        <line x1="10" y1="4" x2="${10 + scalePx}" y2="4" stroke="#F0F4F8" stroke-width="2"/>
-        <line x1="10" y1="0" x2="10" y2="8" stroke="#F0F4F8" stroke-width="2"/>
-        <line x1="${10 + scalePx / 2}" y1="2" x2="${10 + scalePx / 2}" y2="6" stroke="#F0F4F8" stroke-width="1.5"/>
-        <line x1="${10 + scalePx}" y1="0" x2="${10 + scalePx}" y2="8" stroke="#F0F4F8" stroke-width="2"/>
-        <text x="10" y="-2" font-family="'JetBrains Mono', monospace" font-size="8" fill="#8B9BB4">0m</text>
-        <text x="${10 + scalePx / 2}" y="-2" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8" fill="#8B9BB4">2.5m</text>
-        <text x="${10 + scalePx}" y="-2" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8" fill="#8B9BB4">5m (1:100)</text>
+        <rect x="0" y="-14" width="${scalePx + 40}" height="28" rx="4" fill="#0f0f11" stroke="#2c2c2c" stroke-width="1" opacity="0.9"/>
+        <line x1="10" y1="4" x2="${10 + scalePx}" y2="4" stroke="#f4f4f5" stroke-width="2"/>
+        <line x1="10" y1="0" x2="10" y2="8" stroke="#f4f4f5" stroke-width="2"/>
+        <line x1="${10 + scalePx / 2}" y1="2" x2="${10 + scalePx / 2}" y2="6" stroke="#f4f4f5" stroke-width="1.5"/>
+        <line x1="${10 + scalePx}" y1="0" x2="${10 + scalePx}" y2="8" stroke="#f4f4f5" stroke-width="2"/>
+        <text x="10" y="-2" font-family="'JetBrains Mono', monospace" font-size="8" fill="#888888">0m</text>
+        <text x="${10 + scalePx / 2}" y="-2" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8" fill="#888888">2.5m</text>
+        <text x="${10 + scalePx}" y="-2" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8" fill="#888888">5m (1:100)</text>
       </g>
     `;
   }

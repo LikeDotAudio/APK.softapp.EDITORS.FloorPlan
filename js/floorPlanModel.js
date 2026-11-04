@@ -55,7 +55,7 @@ export class FloorPlanModel {
       {
         id: 'room_1',
         name: 'Control Room A',
-        color: '#1E2A45',
+        color: '#2c2c2c',
         polygon: [
           { x: 2, y: 2 },
           { x: 12, y: 2 },
