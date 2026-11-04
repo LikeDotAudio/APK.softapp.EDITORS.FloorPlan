@@ -3,7 +3,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FloorPlanModel, calculatePolygonArea, isPointInPolygon } from '../js/floorPlanModel.js';
+import { FloorPlanModel, calculatePolygonArea, isPointInPolygon, calculateRoomAcoustics, UNCLASSIFIED } from '../js/floorPlanModel.js';
 import { renderFloorPlanSvg } from '../js/floorPlanSvg.js';
 
 test('calculatePolygonArea computes correct square meters for rectangle', () => {
@@ -76,4 +76,34 @@ test('renderFloorPlanSvg generates SVG string containing room and drop elements'
   assert.ok(svg.includes('<svg'));
   assert.ok(svg.includes('Control Room A'));
   assert.ok(svg.includes('scale-bar'));
+});
+
+test('room acoustics come from the room type, never from its name', () => {
+  const polygon = [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 4 }, { x: 0, y: 4 }];
+  // Named like a studio, typed as nothing: not guessed.
+  const guessed = calculateRoomAcoustics({ name: 'Studio B storage', polygon, ceilingHeight_m: 3 });
+  assert.equal(guessed.roomType, UNCLASSIFIED);
+  assert.equal(guessed.classified, false);
+
+  const iso = calculateRoomAcoustics({ name: 'Room 12', roomType: 'Iso Booth', polygon, ceilingHeight_m: 3 });
+  assert.equal(iso.classified, true);
+  assert.equal(iso.meanAbsorption, 0.36);
+  assert.equal(iso.nc_rating, 15);
+  assert.equal(iso.volume_m3, 60);
+  // Sabine: 0.161 * 60 / (S * 0.36), S = 2*20 + 18*3 = 94 m²
+  assert.equal(iso.rt60_estimated, Math.round((0.161 * 60 / (94 * 0.36)) * 100) / 100);
+
+  // A room's own value wins over its preset, including a legitimate zero.
+  const dead = calculateRoomAcoustics({ name: 'x', roomType: 'Iso Booth', polygon, nc_rating: 0 });
+  assert.equal(dead.nc_rating, 0);
+});
+
+test('names are escaped, so every floor renders as well-formed SVG', () => {
+  const model = new FloorPlanModel();
+  for (const floor of model.floors) {
+    model.activeFloorId = floor.id;
+    const svg = renderFloorPlanSvg(model);
+    assert.ok(!/&(?!amp;|lt;|gt;|quot;|#39;)/.test(svg), `raw & on ${floor.id}`);
+  }
+  assert.ok(renderFloorPlanSvg(model).includes('Live &amp; Control'));
 });
