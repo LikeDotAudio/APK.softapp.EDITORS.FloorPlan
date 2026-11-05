@@ -14,6 +14,21 @@ export const DROP_CATEGORIES = {
 };
 
 /**
+ * Lengths on screen are millimetres (every CAD dimension is in mm); the block
+ * keeps metres, as every saved plan, polygon and GeoJSON export already does.
+ * These two convert at the UI edge only.
+ */
+export function metresToMm(m) {
+  return Math.round((Number(m) || 0) * 1000);
+}
+
+/** A typed mm value back to the block's metres; blank / junk is 0. */
+export function mmToMetres(mm) {
+  const n = parseFloat(mm);
+  return Number.isFinite(n) ? n / 1000 : 0;
+}
+
+/**
  * Computes polygon perimeter in meters
  */
 export function calculatePolygonPerimeter(points) {

@@ -1,8 +1,8 @@
 // Part of the APK.audio project — http://APK.audio — made by Anthony Kuzub
 // MIT Licence. Free, for everyone, for ever. Full text in LICENSE at the root.
 
-import { linkBlock, mountDiscovered } from './softappLink.js';
-import { FloorPlanModel, DROP_CATEGORIES } from './floorPlanModel.js';
+import { linkBlock, mountDiscovered, openJsonFile } from './softappLink.js';
+import { FloorPlanModel, DROP_CATEGORIES, metresToMm, mmToMetres } from './floorPlanModel.js';
 import { renderFloorPlanSvg } from './floorPlanSvg.js';
 
 let model = new FloorPlanModel();
@@ -11,6 +11,27 @@ let isPlacingDrop = false;
 
 const S = window.APKSoftapp;
 const esc = S.esc;
+
+S.describe({
+  name: 'Floor Plan Editor',
+  does: 'A facility floor plan: floors and rooms, with numbered drops (data, power, audio...) placed on a 500 mm grid, and a count of each kind.',
+  inputs: [
+    { name: 'Floor plan block', from: 'the CAD (when opened from a drawing), or a .json file via Open Block', kind: 'file' },
+    { name: 'Discovered', from: 'the bus: what scanners and agents found (kinds in config/discovered.json), shown read-only', kind: 'bus' },
+  ],
+  outputs: [
+    { name: 'Floor plan block', to: 'the CAD on Save & Return and on every edit; standalone Save downloads <plan name>.json', kind: 'file' },
+    { name: '<plan name>.geojson', to: 'a download (Export GeoJSON); export only, it does not open back in', kind: 'file' },
+  ],
+  controls: [
+    { name: 'Drop categories', how: 'pick the kind of drop to place' },
+    { name: 'Place Drop Tool', how: 'toggle on, then click the plan to drop one at the snapped point' },
+    { name: 'Click a drop or room', how: 'select it; click empty plan to deselect' },
+    { name: 'Inspector', how: 'drop refdes, label, category, circuit, room, X / Y (mm), Delete; room name' },
+    { name: 'Discovered / Open Block / Export GeoJSON / Save & Return / Close', how: 'header buttons' },
+  ],
+  problems: ['bad_json', 'bad_input', 'file_unreadable', 'not_in_cad', 'bus_missing'],
+});
 
 const bridge = linkBlock(S, {
   editor: 'Floor Plan Editor',
@@ -100,12 +121,12 @@ function renderInspector() {
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
           <div>
-            <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">X (METERS)</label>
-            <input type="number" step="0.5" class="input" id="inp-x" value="${esc(drop.x)}">
+            <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">X (MM)</label>
+            <input type="number" step="500" class="input" id="inp-x" value="${esc(metresToMm(drop.x))}">
           </div>
           <div>
-            <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">Y (METERS)</label>
-            <input type="number" step="0.5" class="input" id="inp-y" value="${esc(drop.y)}">
+            <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">Y (MM)</label>
+            <input type="number" step="500" class="input" id="inp-y" value="${esc(metresToMm(drop.y))}">
           </div>
         </div>
       </div>
@@ -119,7 +140,7 @@ function renderInspector() {
 
     const bindField = (id, prop) => {
       document.getElementById(id)?.addEventListener('input', (e) => {
-        const val = prop === 'x' || prop === 'y' ? parseFloat(e.target.value) || 0 : e.target.value;
+        const val = prop === 'x' || prop === 'y' ? mmToMetres(e.target.value) : e.target.value; // field mm, block m
         model.updateDrop(drop.id, { [prop]: val });
         bridge.changed();
         renderSvg();
@@ -243,7 +264,7 @@ function renderSvg() {
     const rect = svg.getBoundingClientRect();
     const clickPxX = e.clientX - rect.left;
     const clickPxY = e.clientY - rect.top;
-    const xM = Math.round((clickPxX / model.pixelsPerMeter) * 2) / 2; // snap to 0.5m
+    const xM = Math.round((clickPxX / model.pixelsPerMeter) * 2) / 2; // snap to 500 mm (block keeps m)
     const yM = Math.round((clickPxY / model.pixelsPerMeter) * 2) / 2;
 
     if (isPlacingDrop) {
@@ -290,26 +311,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  document.getElementById('btn-open-block')?.addEventListener('click', () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,.geojson';
-    input.onchange = (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const parsed = JSON.parse(event.target.result);
-          bridge.openLocal(parsed, { filename: file.name });
-        } catch (err) {
-          alert('Failed to parse floor plan file: ' + err.message);
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  });
+  document.getElementById('btn-open-block')?.addEventListener('click', () => openJsonFile(S, {
+    what: 'a floor plan block',
+    accept: '.json,.geojson',
+    onJson: (parsed, file) => {
+      // A bare GeoJSON (what Export GeoJSON writes) has no floors / rooms / drops: it would open as the default plan.
+      if (!parsed || typeof parsed !== 'object' || (!parsed.floors && !parsed.rooms && !parsed.drops && parsed.type === 'FeatureCollection')) {
+        throw new TypeError('this is a GeoJSON export (no floors, rooms or drops): open the floor plan block .json that Save & Return wrote');
+      }
+      bridge.openLocal(parsed, { filename: file.name });
+    },
+  }));
 
   mountDiscovered(S, window.APKTable, {
     button: document.getElementById('btn-discovered'),

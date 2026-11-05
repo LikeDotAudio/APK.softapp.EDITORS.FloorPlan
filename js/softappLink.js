@@ -103,9 +103,7 @@ export function mountDiscovered(S, T, { button, panel, status, tableHost, tableI
     if (table) table.setRows(rows);
     if (status) status.textContent = `${rows.length} thing(s) on the bus; trust decays after ${S.TRUST_MINUTES || 5} min unverified.`;
   };
-  button.addEventListener('click', async () => {
-    panel.hidden = !panel.hidden;
-    if (panel.hidden || handle) return;
+  const ask = async () => {
     if (T && tableHost && !table) {
       table = T.create(tableHost, { id: tableId, columns, rows: [], empty: 'Nothing discovered yet.' });
     }
@@ -114,9 +112,51 @@ export function mountDiscovered(S, T, { button, panel, status, tableHost, tableI
     handle = await S.discovered({ kinds: config.kinds, onChange: show });
     if (!handle.ok) {
       if (status) status.textContent = handle.reason;
+      if (handle.problem && S.showProblem) S.showProblem(handle.problem, { subject: 'Discovered', onRetry: ask });
       handle = null;
       return;
     }
     show(handle.things());
+  };
+  button.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    if (panel.hidden || handle) return;
+    ask();
   });
+}
+
+/**
+ * Open a block .json from disk into `onJson(parsed, file)`. A file that cannot
+ * be read, is not JSON, or that onJson rejects (throws) becomes a problem card
+ * (what happened / why / do this) with Retry picking a file again.
+ */
+export function openJsonFile(S, { what, onJson, accept = '.json' }) {
+  const pick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.onchange = (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onerror = () => S.showProblem('file_unreadable', {
+        subject: file.name, detail: reader.error && reader.error.message, onRetry: pick,
+      });
+      reader.onload = (event) => {
+        try {
+          onJson(JSON.parse(event.target.result), file);
+        } catch (err) {
+          S.showProblem(err instanceof SyntaxError ? 'bad_json' : 'bad_input', {
+            subject: file.name,
+            detail: err.message,
+            fix: [`Open ${what} .json (Save outside the CAD downloads one).`],
+            onRetry: pick,
+          });
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+  pick();
 }

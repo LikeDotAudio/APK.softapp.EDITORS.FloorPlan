@@ -107,3 +107,16 @@ test('names are escaped, so every floor renders as well-formed SVG', () => {
   }
   assert.ok(renderFloorPlanSvg(model).includes('Live &amp; Control'));
 });
+
+test('drop X / Y show in mm while the block keeps metres', async () => {
+  const { metresToMm, mmToMetres } = await import('../js/floorPlanModel.js');
+  assert.equal(metresToMm(5.5), 5500);
+  assert.equal(metresToMm(0.0125), 13);
+  assert.equal(mmToMetres('7250'), 7.25);
+  assert.equal(mmToMetres(''), 0);
+  assert.equal(mmToMetres(metresToMm(12.345)), 12.345);
+  const m = new FloorPlanModel();
+  const d = m.addDrop({ x: 3, y: 4 });
+  m.updateDrop(d.id, { x: mmToMetres('6500') });
+  assert.equal(m.toJSON().drops.find((x) => x.id === d.id).x, 6.5);
+});
