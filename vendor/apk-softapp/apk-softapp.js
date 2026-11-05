@@ -767,7 +767,7 @@
             } });
         }
         var cfgOf = function () {
-            if (opts.config) return Promise.resolve(checkConfig(opts.config, opts.configUrl || 'config'));
+            if (opts.config) return Promise.resolve(checkConfig(opts.config, String(opts.configUrl || opts.config.url || 'config')));
             if (opts.configUrl) return discoveredConfig(opts.configUrl, { required: opts.required });
             return Promise.resolve(checkConfig({ kinds: opts.kinds || [] }, 'kinds'));
         };
