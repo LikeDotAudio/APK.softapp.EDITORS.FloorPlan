@@ -98,7 +98,16 @@ export function libraryButton(onItems, { doc = globalThis.document, label = 'ðŸ“
     } finally { b.disabled = false; }
   };
   b.addEventListener('click', go);
-  if (shortcut) doc.addEventListener('keydown', (e) => { if (isLibraryShortcut(e)) { e.preventDefault(); go(); } });
+  if (shortcut) {
+    // one shortcut per button on the page: a button drawn again (an inspector re-render) drops its old listener
+    let seen = false;
+    const onKey = (e) => {
+      if (!b.isConnected) { if (seen) doc.removeEventListener('keydown', onKey); return; }
+      seen = true;
+      if (isLibraryShortcut(e)) { e.preventDefault(); go(); }
+    };
+    doc.addEventListener('keydown', onKey);
+  }
   return b;
 }
 
