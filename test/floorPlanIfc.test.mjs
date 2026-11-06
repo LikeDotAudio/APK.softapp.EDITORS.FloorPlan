@@ -1,7 +1,7 @@
 // Part of the APK.audio project — http://APK.audio — made by Anthony Kuzub
 // MIT Licence. Free, for everyone, for ever. Full text in LICENSE at the root.
 // cad-8: the plan as IFC4X3_ADD2 — storeys, spaces, drops as occurrences, circuits — and back.
-// IFC_OUT=<dir> node --test test/  also writes the files there, for IfcOpenShell validate + ifctester.
+// IFC_OUT=<dir> npm test  also writes the files there, for IfcOpenShell validate + ifctester.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
