@@ -2,12 +2,14 @@
 // MIT Licence. Free, for everyone, for ever. Full text in LICENSE at the root.
 
 import { linkBlock, mountDiscovered, openJsonFile } from './softappLink.js';
-import { FloorPlanModel, DROP_CATEGORIES, metresToMm, mmToMetres } from './floorPlanModel.js';
+import { FloorPlanModel, DROP_CATEGORIES, categoryForPart, metresToMm, mmToMetres } from './floorPlanModel.js';
+import { libraryButton, acceptLibraryDrops, bimFields } from './bimLibrary.js';
 import { renderFloorPlanSvg } from './floorPlanSvg.js';
 
 let model = new FloorPlanModel();
 let activeCategory = 'DATA';
 let isPlacingDrop = false;
+let pendingPart = null;   // a BIM part picked from 📚 Library, placed on the next click (ROAD-3572)
 
 const S = window.APKSoftapp;
 const esc = S.esc;
@@ -26,6 +28,7 @@ S.describe({
   controls: [
     { name: 'Drop categories', how: 'pick the kind of drop to place' },
     { name: 'Place Drop Tool', how: 'toggle on, then click the plan to drop one at the snapped point' },
+    { name: '📚 Library', how: 'pick a device from the BIM library (Ctrl+Shift+L), then click the plan to place it — or drag a part from the library onto the plan; it keeps its bimId and bimRef' },
     { name: 'Click a drop or room', how: 'select it; click empty plan to deselect' },
     { name: 'Inspector', how: 'drop refdes, label, category, circuit, room, X / Y (mm), Delete; room name' },
     { name: 'Discovered / Open Block / Export GeoJSON / Save & Return / Close', how: 'header buttons' },
@@ -99,6 +102,7 @@ function renderInspector() {
           <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">REFERENCE DESIGNATION</label>
           <input type="text" class="input" id="inp-refdes" value="${esc(drop.refdes)}">
         </div>
+        ${drop.bimId ? `<div class="drop-bim-part" title="${esc((drop.bimRef && drop.bimRef.url) || '')}" style="font-size: 11px; color: var(--osc-text-muted);">📚 BIM part <b>${esc(drop.bimId)}</b></div>` : ''}
         <div>
           <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">LABEL / PURPOSE</label>
           <input type="text" class="input" id="inp-label" value="${esc(drop.label)}">
@@ -268,11 +272,12 @@ function renderSvg() {
     const yM = Math.round((clickPxY / model.pixelsPerMeter) * 2) / 2;
 
     if (isPlacingDrop) {
-      const newDrop = model.addDrop({
+      const newDrop = pendingPart ? model.addDrop(dropForPart(pendingPart, xM, yM)) : model.addDrop({
         category: activeCategory,
         x: xM,
         y: yM,
       });
+      pendingPart = null;
       model.selectedDropId = newDrop.id;
       model.selectedRoomId = null;
       isPlacingDrop = false;
@@ -286,6 +291,12 @@ function renderSvg() {
       renderAll();
     }
   });
+}
+
+/** A drop for a part from the library: its kind, its name, its part and BIM reference. */
+function dropForPart(item, x, y) {
+  const { bimId, bimRef } = bimFields(item);
+  return { category: categoryForPart(item.bim), label: item.bim.name || `${item.bim.manufacturer || ''} ${item.bim.model || ''}`.trim() || bimId, x, y, bimId, bimRef };
 }
 
 function renderAll() {
@@ -309,6 +320,28 @@ document.addEventListener('DOMContentLoaded', () => {
       btn?.classList.remove('btn-primary');
       btn?.classList.add('btn-secondary');
     }
+  });
+
+  // 📚 Library (ROAD-3572): pick a device, then click the plan to place it
+  const placeBtn = document.getElementById('btn-mode-place');
+  placeBtn?.after(libraryButton((items) => {
+    pendingPart = items[0];
+    isPlacingDrop = true;
+    placeBtn.classList.remove('btn-secondary');
+    placeBtn.classList.add('btn-primary');
+  }, { className: 'btn btn-secondary btn-sm', title: 'Place a device from the BIM library: pick it, then click the plan' }));
+  // a part dragged from the library onto the plan is placed where it is let go
+  const wrapper = document.getElementById('canvas-wrapper');
+  if (wrapper) acceptLibraryDrops(wrapper, (item, e) => {
+    const svg = wrapper.querySelector('#floorplan-canvas-svg');
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const snap = (px) => Math.round((px / model.pixelsPerMeter) * 2) / 2;
+    const d = model.addDrop(dropForPart(item, snap(e.clientX - rect.left), snap(e.clientY - rect.top)));
+    model.selectedDropId = d.id;
+    model.selectedRoomId = null;
+    bridge.changed();
+    renderAll();
   });
 
   document.getElementById('btn-open-block')?.addEventListener('click', () => openJsonFile(S, {

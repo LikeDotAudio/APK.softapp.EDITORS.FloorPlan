@@ -120,3 +120,14 @@ test('drop X / Y show in mm while the block keeps metres', async () => {
   m.updateDrop(d.id, { x: mmToMetres('6500') });
   assert.equal(m.toJSON().drops.find((x) => x.id === d.id).x, 6.5);
 });
+
+import { categoryForPart } from '../js/floorPlanModel.js';
+test('a device from the BIM library is a drop that keeps its part and BIM reference (ROAD-3572)', () => {
+  const m = new FloorPlanModel();
+  const ref = { part: 'shure/mxa920', url: 'http://bench:8160/api/bim/parts/shure/mxa920', rev: 'r1' };
+  const d = m.addDrop({ category: categoryForPart({ category: 'Microphones' }), label: 'Shure MXA920', x: 6, y: 6, bimId: 'shure/mxa920', bimRef: ref });
+  assert.equal(d.category, 'MIC');
+  assert.deepEqual([d.bimId, d.bimRef], ['shure/mxa920', ref]);
+  const plain = m.addDrop({ category: 'DATA', x: 2, y: 2 });
+  assert.ok(!('bimRef' in plain), 'a plain drop carries no BIM fields');
+});

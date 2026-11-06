@@ -13,6 +13,18 @@ export const DROP_CATEGORIES = {
   ACOUSTIC_MIC: { label: 'Measurement / RTA Mic', icon: '📡', color: '#14B8A6' },
 };
 
+/** The drop kind a BIM part is drawn as (📚 Library, ROAD-3572): by its category and class. */
+export function categoryForPart(bim = {}) {
+  const c = `${bim.category || ''} ${bim.class || ''}`.toLowerCase();
+  if (/microphone|\bmic/.test(c)) return 'MIC';
+  if (/speaker|loudspeaker|monitor/.test(c)) return 'SPEAKER';
+  if (/acoustic/.test(c)) return 'ACOUSTIC_PANEL';
+  if (/video|display/.test(c)) return 'VIDEO';
+  if (/power/.test(c)) return 'POWER';
+  if (/audio/.test(c)) return 'AUDIO';
+  return 'DATA';
+}
+
 /**
  * Lengths on screen are millimetres (every CAD dimension is in mm); the block
  * keeps metres, as every saved plan, polygon and GeoJSON export already does.
@@ -349,6 +361,9 @@ export class FloorPlanModel {
       room: this.resolveRoomAt(drop.x || 5, drop.y || 5),
       circuit: drop.circuit || 'UNASSIGNED',
     };
+    // a device placed from the BIM library keeps its part and BIM reference (ROAD-3572)
+    if (drop.bimId) newDrop.bimId = String(drop.bimId);
+    if (drop.bimRef && drop.bimRef.part) newDrop.bimRef = { ...drop.bimRef };
     this.drops.push(newDrop);
     return newDrop;
   }
