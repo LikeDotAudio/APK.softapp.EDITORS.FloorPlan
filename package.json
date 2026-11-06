@@ -1,6 +1,6 @@
 {
   "name": "editors-floor-plan",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "description": "Architectural floor plan spatial editor with room boundaries, drop markers, and scale bars",
   "scripts": {
