@@ -7,16 +7,22 @@
 
    The picker is DATABASE.server.BIM's (ROAD-3575, contract apk.bim.library@1):
    APKLibrary.pick({filter, multiple}) → [{bim, ref}], cancel rejects (AbortError
-   'cancelled'). It is loaded from the copy published beside the OS — the same relative
-   path on :8080, the gateway and apk.audio — which calls up the live library on this
-   host when there is one and the snapshot otherwise; elsewhere (a site with no OS beside
-   it) from apk.audio. What is placed keeps `bimId` (the part) and `bimRef` ({part, url,
-   rev}, the BIM reference). Picking a project's unplaced instances waits for ROAD-3581.
+   'cancelled'). It is loaded from the copy published with the OS — /APK%3AOS/… on :8080,
+   the gateway and apk.audio alike, a root path, never a relative climb out of this
+   repository — which calls up the live library on this host when there is one and the
+   snapshot otherwise; elsewhere (a site with no OS) from apk.audio. A page with its own
+   config point names its own with setPickerUrls(). What is placed keeps `bimId` (the
+   part) and `bimRef` ({part, url, rev}, the BIM reference). The same script carries
+   liveDevices / defaultGuiFor / openDefaultGui (the bench's boxes of a part).
+   Picking a project's unplaced instances waits for ROAD-3581.
 
    The same file in every editor that adds a device; change them together. */
 
-export const PICKER_URLS = ['../../../APK%3AOS/system/bim/library/picker.js',
+export const PICKER_URLS = ['/APK%3AOS/system/bim/library/picker.js',
   'https://apk.audio/APK%3AOS/system/bim/library/picker.js'];
+let pickerUrls = PICKER_URLS;
+/** Where this page loads the picker from, in order (a host's config point). */
+export function setPickerUrls(urls) { if (Array.isArray(urls) && urls.length) pickerUrls = urls.slice(); }
 export const BIM_MIME = 'application/x-apk-bim';
 export const SHORTCUT = 'Ctrl+Shift+L';
 
@@ -35,7 +41,7 @@ function loadScript(src, doc) {
 }
 
 /** window.APKLibrary, loading the picker the first time. */
-export function loadLibrary({ doc = globalThis.document, urls = PICKER_URLS } = {}) {
+export function loadLibrary({ doc = globalThis.document, urls = pickerUrls } = {}) {
   if (globalThis.APKLibrary) return Promise.resolve(globalThis.APKLibrary);
   if (!loading) {
     loading = urls.reduce((p, url) => p.catch(() => loadScript(url, doc)), Promise.reject(new Error('no picker')))

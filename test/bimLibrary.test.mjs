@@ -3,7 +3,7 @@
 /* 📚 the BIM library, called up here (ROAD-3572): what an element keeps from a pick. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bimFields, bimRefOf, isLibraryShortcut, readLibraryDrop, pickFromLibrary, BIM_MIME } from '../js/bimLibrary.js';
+import { bimFields, bimRefOf, isLibraryShortcut, readLibraryDrop, pickFromLibrary, BIM_MIME, PICKER_URLS } from '../js/bimLibrary.js';
 
 const ITEM = {
   bim: { id: 'keysight/34401a', manufacturer: 'Keysight', model: '34401A', name: 'Keysight 34401A' },
@@ -34,4 +34,8 @@ test('closing the library without a pick is no items, not an error', async () =>
   const was = globalThis.APKLibrary;
   globalThis.APKLibrary = { pick: async () => { const e = new Error('closed'); e.name = 'AbortError'; e.code = 'cancelled'; throw e; } };
   try { assert.deepEqual(await pickFromLibrary(), []); } finally { globalThis.APKLibrary = was; }
+});
+
+test('the picker is found by a root path or an absolute url, never a relative climb out of the repository', () => {
+  for (const u of PICKER_URLS) assert.ok(/^(\/|https:)/.test(u) && !u.includes('../'), u);
 });
