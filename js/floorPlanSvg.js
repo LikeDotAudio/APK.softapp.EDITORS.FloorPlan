@@ -1,7 +1,7 @@
 // Part of the APK.audio project — http://APK.audio — made by Anthony Kuzub
 // MIT Licence. Free, for everyone, for ever. Full text in LICENSE at the root.
 
-import { calculatePolygonArea, calculateRoomAcoustics, DROP_CATEGORIES } from './floorPlanModel.js';
+import { calculatePolygonArea, calculateRoomAcoustics, DROP_CATEGORIES, isPointInPolygon } from './floorPlanModel.js';
 
 /** Text and attribute values into SVG markup: "Live & Control" must not end the document. */
 function esc(value) {
@@ -112,9 +112,12 @@ export function renderFloorPlanSvg(model, options = {}) {
       `;
 
       // Monitor Speaker Coverage
+      // the room's SPEAKER drops (a plan saved before cad-8 may still list room.speakers)
       let speakersSvg = '';
-      if (room.speakers && Array.isArray(room.speakers)) {
-        speakersSvg = room.speakers.map((spk) => {
+      const speakers = Array.isArray(room.speakers) ? room.speakers
+        : (model.drops || []).filter((d) => d.category === 'SPEAKER' && isPointInPolygon(d, room.polygon)).map((d) => ({ x: d.x, y: d.y, label: d.label }));
+      if (speakers.length) {
+        speakersSvg = speakers.map((spk) => {
           const sx = spk.x * ppm;
           const sy = spk.y * ppm;
           return `

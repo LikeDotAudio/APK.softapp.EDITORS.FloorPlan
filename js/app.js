@@ -5,6 +5,7 @@ import { linkBlock, mountDiscovered, openJsonFile } from './softappLink.js';
 import { FloorPlanModel, DROP_CATEGORIES, categoryForPart, metresToMm, mmToMetres } from './floorPlanModel.js';
 import { libraryButton, acceptLibraryDrops, bimFields } from './bimLibrary.js';
 import { renderFloorPlanSvg } from './floorPlanSvg.js';
+import { fromIfc, toIfc } from './ifc/floorPlanIfc.js';
 
 let model = new FloorPlanModel();
 let activeCategory = 'DATA';
@@ -19,11 +20,13 @@ S.describe({
   does: 'A facility floor plan: floors and rooms, with numbered drops (data, power, audio...) placed on a 500 mm grid, and a count of each kind.',
   inputs: [
     { name: 'Floor plan block', from: 'the CAD (when opened from a drawing), or a .json file via Open Block', kind: 'file' },
+    { name: '<plan>.ifc', from: 'Open Model: an IFC4X3 file (storeys → floors, spaces → rooms, occurrences → drops), or the plan .json', kind: 'file' },
     { name: 'Discovered', from: 'the bus: what scanners and agents found (kinds in config/discovered.json), shown read-only', kind: 'bus' },
   ],
   outputs: [
     { name: 'Floor plan block', to: 'the CAD on Save & Return and on every edit; standalone Save downloads <plan name>.json', kind: 'file' },
-    { name: '<plan name>.geojson', to: 'a download (Export GeoJSON); export only, it does not open back in', kind: 'file' },
+    { name: '<plan name>.ifc + .json', to: 'Save Model: the plan as IFC4X3_ADD2 (storeys, spaces, drops as occurrences, circuits; mm) and its native .json twin', kind: 'file' },
+    { name: '<plan name>.geojson', to: 'a download (Export GeoJSON); a GIS convenience export only, it does not open back in', kind: 'file' },
   ],
   controls: [
     { name: 'Drop categories', how: 'pick the kind of drop to place' },
@@ -31,9 +34,9 @@ S.describe({
     { name: '📚 Library', how: 'pick a device from the BIM library (Ctrl+Shift+L), then click the plan to place it — or drag a part from the library onto the plan; it keeps its bimId and bimRef' },
     { name: 'Click a drop or room', how: 'select it; click empty plan to deselect' },
     { name: 'Inspector', how: 'drop refdes, label, category, circuit, room, X / Y (mm), Delete; room name' },
-    { name: 'Discovered / Open Block / Export GeoJSON / Save & Return / Close', how: 'header buttons' },
+    { name: 'Discovered / Open Block / Open Model / Save Model / Export GeoJSON / Save & Return / Close', how: 'header buttons' },
   ],
-  problems: ['bad_json', 'bad_input', 'file_unreadable', 'not_in_cad', 'bus_missing'],
+  problems: ['bad_json', 'bad_input', 'file_unreadable', 'not_in_cad', 'bus_missing', 'save_failed'],
 });
 
 const bridge = linkBlock(S, {
@@ -366,6 +369,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btn-save-block')?.addEventListener('click', () => {
     bridge.save();
+  });
+
+  // Save Model / Open Model: the plan as IFC4X3 with its .json twin (cad-8, apk-softapp saveModel / openModel)
+  document.getElementById('btn-save-model')?.addEventListener('click', async () => {
+    const r = await S.saveModel(model, { name: model.name.toLowerCase().replace(/\s+/g, '_'), toIfc: (m) => toIfc(m), toJson: (m) => m.toJSON() });
+    if (!r.ok && !r.cancelled && r.problem) S.showProblem(r.problem);
+  });
+  document.getElementById('btn-open-model')?.addEventListener('click', async () => {
+    const o = await S.openModel({ fromIfc: (t) => fromIfc(t), fromJson: (data) => data });
+    if (o.ok) bridge.openLocal(o.model, { filename: o.name || '' });
+    else if (!o.cancelled && o.problem) S.showProblem(o.problem);
   });
 
   document.getElementById('btn-export-geojson')?.addEventListener('click', () => {

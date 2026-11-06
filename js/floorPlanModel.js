@@ -164,10 +164,6 @@ export const DEFAULT_FLOORS = [
         target_rt60: 0.24,
         nc_rating: 20,
         mixPosition: { x: 7, y: 6 },
-        speakers: [
-          { id: 'spk_l', label: 'Monitor L', x: 4, y: 3 },
-          { id: 'spk_r', label: 'Monitor R', x: 10, y: 3 },
-        ],
         polygon: [
           { x: 2, y: 2 },
           { x: 12, y: 2 },
