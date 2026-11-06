@@ -20,9 +20,15 @@
  *     AUDIO IfcOutlet AUDIOVISUALOUTLET · DATA … DATAOUTLET · POWER … POWEROUTLET
  *     ACOUSTIC_MIC IfcSensor SOUNDSENSOR · ACOUSTIC_PANEL / DIFFUSER IfcCovering
  *     USERDEFINED ABSORBER / DIFFUSER · anything else IfcBuildingElementProxy.
- *   A drop placed from the BIM library is typed by its part (a stub type of the
- *   same class carrying APK_Part.PartId, GlobalId part/<id> — the same one the
- *   CAD and the BIM library write); one without a part is Stage 'stub'.
+ *   A drop placed from the BIM library is typed by its part: the part's own
+ *   IFC type, embedded from its stored twin (opts.types {partId: the text of
+ *   GET /api/bim/parts/<id>.ifc}, js/partTypes.js; ifc/partType.js) with its
+ *   sets, Body map and ports, GlobalIds as the part file has them — and then the
+ *   occurrence is that type's own entity (IfcXType types an IfcX), the category's
+ *   PredefinedType kept only when the entity is the category's. A part whose
+ *   twin is not to hand gets a stub type of the category's class carrying
+ *   APK_Part.PartId (GlobalId part/<id>, the one the BIM library writes); a drop
+ *   without a part is Stage 'stub'.
  * - Each named circuit is an IfcDistributionCircuit (ELECTRICAL) the drops on
  *   it are assigned to (IfcRelAssignsToGroup).
  *
@@ -32,6 +38,7 @@
  */
 import { entitiesByType, getPsets, ifcGuid, isRef, parseStep, unwrap } from '../../vendor/apk-contracts/apk-ifc.js';
 import { calculatePolygonArea, calculatePolygonPerimeter } from '../floorPlanModel.js';
+import { embedPartType, occurrenceOf } from './partType.js';
 import { E, R, StepWriter, bool, ident, int, label, measure, projectFrame, psetWriter, stepHeader, text } from './stepWriter.js';
 
 export const FLOORPLAN_IFC_SCHEMA = 'apk.floorplan/ifc@1';
@@ -51,6 +58,14 @@ export const DROP_IFC = Object.freeze({
   DIFFUSER: ['IFCCOVERING', 'USERDEFINED', 'DIFFUSER'],
 });
 export const dropEntity = (category) => DROP_IFC[category] || ['IFCBUILDINGELEMENTPROXY', 'USERDEFINED', String(category || 'DROP')];
+
+/** An occurrence's attributes: the IfcElement head (GlobalId … Tag) and its PredefinedType where its entity puts it. */
+function occurrenceArgs(entity, head, pre) {
+  const p = pre ? E(pre) : null;
+  if (entity === 'IFCELEMENTASSEMBLY') return [...head, null, p];
+  if (entity === 'IFCMECHANICALFASTENER') return [...head, null, null, p];
+  return [...head, p];
+}
 
 /** A circuit that is a placeholder, not a circuit. */
 const UNASSIGNED = new Set(['', 'UNASSIGNED']);
@@ -110,6 +125,20 @@ export function toIfc(planIn, opts = {}) {
   const types = new Map();
   const typed = new Map();
   const partSeen = new Set();
+  const partTypes = opts.types ?? {};
+  const full = new Map(); // partId → the embedded type {ref, entity, name} | null
+  const embedded = (pid) => {
+    if (!full.has(pid)) {
+      let t = null;
+      const textOf = partTypes[pid];
+      if (typeof textOf === 'string' && textOf.startsWith('ISO-10303-21')) {
+        try { t = embedPartType(w, F, textOf, pid); } catch (_) { t = null; }
+      }
+      if (t) partSeen.add(pid);
+      full.set(pid, t);
+    }
+    return full.get(pid);
+  };
   for (const [fi, floor] of (plan.floors ?? []).entries()) {
     const fid = floor.id ?? `floor_${fi + 1}`;
     const assumed = floor.elevation_mm === undefined;
@@ -165,16 +194,25 @@ export function toIfc(planIn, opts = {}) {
 
     // ---- drops
     for (const d of floor.drops ?? []) {
-      const [entity, pre, objType] = dropEntity(d.category);
+      const [catEntity, catPre, catObjType] = dropEntity(d.category);
       const g = role('drop', d.id);
       const at = { x: Number(d.x) || 0, y: Number(d.y) || 0 };
       const room = spaces.find((s) => inside(at, s.poly));
       const relTo = room ? w.entity(room.ref).args[5] : storeyPl;
-      const occ = w.add(entity, [g, oh, d.label ?? null, null, objType ?? null, local(relTo, MM(at.x), MM(at.y)), null, d.refdes ?? null, E(pre)]);
+      const part = d.bimRef?.part || d.bimId;
+      const full = part ? embedded(part) : null;
+      const entity = full ? occurrenceOf(full.entity) : catEntity;
+      const own = entity === catEntity; // the category's words fit this entity
+      const pre = own ? catPre : null;
+      const objType = own ? catObjType : undefined;
+      const occ = w.add(entity, occurrenceArgs(entity, [g, oh, d.label ?? null, null, objType ?? null, local(relTo, MM(at.x), MM(at.y)), null, d.refdes ?? null], pre));
       if (room) (held.get(room.ref) ?? held.set(room.ref, []).get(room.ref)).push(occ);
       else inStorey.push(occ);
-      const part = d.bimRef?.part || d.bimId;
-      if (part) {
+      if (full) {
+        const key = `part:${part}`;
+        types.set(key, full.ref);
+        (typed.get(key) ?? typed.set(key, []).get(key)).push(occ);
+      } else if (part) {
         const key = `${entity}:${part}`;
         if (!types.has(key)) {
           const partSet = w.add('IFCPROPERTYSET', [ifcGuid('part', part, 'pset', 'APK_Part', entity), oh, 'APK_Part', null, [

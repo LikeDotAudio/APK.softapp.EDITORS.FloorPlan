@@ -6,6 +6,9 @@ import { FloorPlanModel, DROP_CATEGORIES, categoryForPart, metresToMm, mmToMetre
 import { libraryButton, acceptLibraryDrops, bimFields } from './bimLibrary.js';
 import { renderFloorPlanSvg } from './floorPlanSvg.js';
 import { fromIfc, toIfc } from './ifc/floorPlanIfc.js';
+import { loadPartTypes } from './partTypes.js';
+
+const typeCache = new Map(); // partId → its .ifc type text | null
 
 let model = new FloorPlanModel();
 let activeCategory = 'DATA';
@@ -21,6 +24,7 @@ S.describe({
   inputs: [
     { name: 'Floor plan block', from: 'the CAD (when opened from a drawing), or a .json file via Open Block', kind: 'file' },
     { name: '<plan>.ifc', from: 'Open Model: an IFC4X3 file (storeys → floors, spaces → rooms, occurrences → drops), or the plan .json', kind: 'file' },
+    { name: 'Part types', from: "GET /api/bim/parts/<maker>/<model>.ifc: each placed part's own IFC type, embedded in Save Model", kind: 'http' },
     { name: 'Discovered', from: 'the bus: what scanners and agents found (kinds in config/discovered.json), shown read-only', kind: 'bus' },
   ],
   outputs: [
@@ -373,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Save Model / Open Model: the plan as IFC4X3 with its .json twin (cad-8, apk-softapp saveModel / openModel)
   document.getElementById('btn-save-model')?.addEventListener('click', async () => {
-    const r = await S.saveModel(model, { name: model.name.toLowerCase().replace(/\s+/g, '_'), toIfc: (m) => toIfc(m), toJson: (m) => m.toJSON() });
+    const r = await S.saveModel(model, { name: model.name.toLowerCase().replace(/\s+/g, '_'), toIfc: async (m) => toIfc(m, { types: (await loadPartTypes(m, typeCache)).types }), toJson: (m) => m.toJSON() });
     if (!r.ok && !r.cancelled && r.problem) S.showProblem(r.problem);
   });
   document.getElementById('btn-open-model')?.addEventListener('click', async () => {

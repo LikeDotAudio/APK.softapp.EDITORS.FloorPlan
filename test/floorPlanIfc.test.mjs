@@ -5,11 +5,17 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FloorPlanModel } from '../js/floorPlanModel.js';
 import { DROP_IFC, fromIfc, toIfc } from '../js/ifc/floorPlanIfc.js';
-import { entitiesByType, getPsets, parseStep } from '../vendor/apk-contracts/apk-ifc.js';
+import { entitiesByType, getPsets, ifcGuid, parseStep, ports } from '../vendor/apk-contracts/apk-ifc.js';
+import { loadPartTypes, partIfcUrl } from '../js/partTypes.js';
+
+// The part types are the BIM library's stored twins (DATABASE.server.BIM SRC/library/<maker>/<model>.ifc),
+// copied into fixtures/parts so this repo tests on its own.
+const PARTS = new URL('./fixtures/parts/', import.meta.url);
+const partTypes = () => Object.fromEntries(readdirSync(PARTS).sort().map((f) => [f.replace('--', '/').replace(/\.ifc$/, ''), readFileSync(new URL(f, PARTS), 'utf8')]));
 
 const emit = (name, text) => {
   if (!process.env.IFC_OUT) return;
@@ -76,14 +82,37 @@ test('a drop from the BIM library is typed by its part; odd fields and a legacy 
   m.addDrop({ category: 'DIFFUSER', x: 50, y: 50 }); // clamped onto the plan, outside every room
   m.addDrop({ category: 'ACOUSTIC_MIC', x: 6, y: 6, circuit: 'UNASSIGNED' });
   m.drops[m.drops.length - 1].custom = { a: 1 };
-  const text = toIfc(m);
+  m.addDrop({ category: 'SPEAKER', x: 6.5, y: 4.125, bimId: 'google/google-nest-mini', bimRef: { part: 'google/google-nest-mini', url: '/api/bim/parts/google/google-nest-mini', rev: 'r1' }, label: 'Nest' });
+  m.addDrop({ category: 'SPEAKER', x: 7.5, y: 4.125, bimId: 'genelec/8040bpm', label: 'No twin' });
+  const text = toIfc(m, { types: partTypes() });
   emit('floorplan-bim.ifc', text);
   assert.deepEqual(fromIfc(text), plain(m));
+  assert.equal(toIfc(m, { types: partTypes() }), text);
   const f = parseStep(text);
-  const types = entitiesByType(f, 'IFCAUDIOVISUALAPPLIANCETYPE');
-  assert.equal(types.length, 1);
-  assert.equal(getPsets(f, types[0]).APK_Part.PartId, 'genelec/8050bpm');
-  assert.equal(entitiesByType(f, 'IFCRELDEFINESBYTYPE').length, 1);
+  // the parts' own types, embedded: their GlobalIds, makers, ratings, Body map and ports come with them
+  const nest = entitiesByType(f, 'IFCAUDIOVISUALAPPLIANCETYPE').find((t) => t.args[7] === 'google/google-nest-mini');
+  const ps = getPsets(f, nest);
+  assert.equal(ps.Pset_ManufacturerTypeInformation.Manufacturer, 'Google');
+  assert.ok(ps.Pset_ElectricalDeviceCommon.HeatDissipation > 0);
+  assert.ok(ps.Pset_ElectricalDeviceCommon.RatedVoltage);
+  assert.equal(nest.args[0], ifcGuid('part', 'google/google-nest-mini'));
+  assert.ok(ports(f, nest).length > 0);
+  // the genelec's twin types it as an IfcElectricApplianceType: the drop is that type's occurrence
+  const gen = entitiesByType(f, 'IFCELECTRICAPPLIANCETYPE')[0];
+  assert.equal(gen.args[0], ifcGuid('part', 'genelec/8050bpm'));
+  assert.equal(getPsets(f, gen).Pset_ManufacturerTypeInformation.ModelReference, '8050BPM');
+  const genOcc = entitiesByType(f, 'IFCELECTRICAPPLIANCE')[0];
+  assert.equal(genOcc.args[2], 'Genelec L');
+  assert.equal(genOcc.args[8], null);
+  assert.equal(getPsets(f, genOcc).APK_FloorPlanDrop.Category, 'SPEAKER');
+  // no twin to hand: a stub of the category's class naming the part
+  const stub = entitiesByType(f, 'IFCAUDIOVISUALAPPLIANCETYPE').find((t) => t.args[7] === 'genelec/8040bpm');
+  assert.equal(getPsets(f, stub).APK_Part.Stage, 'stub');
+  assert.equal(entitiesByType(f, 'IFCRELDEFINESBYTYPE').length, 3);
+  // units the parts measure in join the plan's assignment once each
+  const kinds = entitiesByType(f, 'IFCUNITASSIGNMENT')[0].args[0].map((r) => f.byId.get(r.id).args[1].value);
+  assert.equal(new Set(kinds).size, kinds.length);
+  assert.ok(kinds.includes('ELECTRICVOLTAGEUNIT'));
   const panel = entitiesByType(f, 'IFCCOVERING').find((c) => c.args[4] === 'ABSORBER');
   assert.equal(enumOf(panel.args[8]), 'USERDEFINED');
   assert.equal(getPsets(f, panel).APK_FloorPlanDrop.Stage, 'stub');
@@ -99,4 +128,25 @@ test('a foreign file with storeys and spaces opens as floors and rooms', () => {
   assert.equal(plan.floors[0].rooms.length, 3);
   assert.deepEqual(plan.floors[0].rooms[0].polygon, m.floors[0].rooms[0].polygon);
   assert.throws(() => fromIfc('not a step file'), /not an IFC file/);
+});
+
+test('Save Model fetches each placed part type once from the BIM API; a part that does not answer is missing', async () => {
+  const m = new FloorPlanModel({ id: 'plan_fetch' });
+  m.addDrop({ category: 'SPEAKER', x: 1, y: 1, bimId: 'google/google-nest-mini' });
+  m.addDrop({ category: 'SPEAKER', x: 2, y: 1, bimId: 'google/google-nest-mini' });
+  m.addDrop({ category: 'MIC', x: 3, y: 1, bimRef: { part: 'nobody/none' } });
+  const asked = [];
+  const types = partTypes();
+  const fetchFn = async (url) => {
+    asked.push(url);
+    const pid = Object.keys(types).find((k) => partIfcUrl(k, '/api/bim') === url);
+    return pid ? { ok: true, text: async () => types[pid] } : { ok: false, text: async () => '' };
+  };
+  const cache = new Map();
+  const r = await loadPartTypes(m, cache, { fetchFn, base: '/api/bim' });
+  assert.deepEqual(Object.keys(r.types), ['google/google-nest-mini']);
+  assert.deepEqual(r.missing, ['nobody/none']);
+  assert.deepEqual(asked, ['/api/bim/parts/google/google-nest-mini.ifc', '/api/bim/parts/nobody/none.ifc']);
+  await loadPartTypes(m, cache, { fetchFn, base: '/api/bim' });
+  assert.equal(asked.length, 2);
 });
